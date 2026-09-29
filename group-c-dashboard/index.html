@@ -1,0 +1,105 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SignGuard</title>
+<style>
+:root{--bg:#0b1020;--panel:#141a2e;--line:#26304d;--tx:#e6e9f5;--mut:#8b95b5;--ok:#22c55e;--bad:#ef4444;--acc:#7c8cff}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--tx)}
+.logo{font:800 34px/1 Georgia,serif;font-style:italic;background:linear-gradient(90deg,#f0abfc,#7c8cff,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hide{display:none!important}.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+input,select{width:100%;background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:11px 12px;margin:5px 0;font:inherit}
+input:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+button{background:var(--acc);color:#0b1020;font:600 14px inherit;border:0;border-radius:8px;padding:10px 16px;cursor:pointer}
+button.ghost{background:transparent;color:var(--tx);border:1px solid var(--line)}button.bad{background:var(--bad);color:#fff}button.full{width:100%;margin-top:8px}
+#auth{max-width:350px;margin:9vh auto;padding:0 14px;text-align:center}#auth .card{padding:26px 24px}#auth .logo{margin:6px 0 4px}
+#auth p.sub{color:var(--mut);margin:0 0 16px}.switch{margin-top:12px;text-align:center}.switch a{color:var(--acc);cursor:pointer;font-weight:600}
+.err{color:#f87171;min-height:22px;margin:8px 0 0;font-size:14px}
+header{display:flex;align-items:center;gap:6px;padding:12px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}header .logo{font-size:26px;margin-right:auto}
+nav button{background:transparent;color:var(--mut)}nav button.on{background:var(--panel);color:var(--tx)}
+main{max-width:860px;margin:auto;padding:18px 14px 60px;display:grid;gap:14px}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:26px;text-align:center;color:var(--mut);cursor:pointer;display:block}.drop:hover,.drop.has{border-color:var(--acc);color:var(--tx)}
+.pill{display:inline-block;padding:2px 12px;border-radius:99px;font-weight:700;font-size:13px}.ACCEPT{background:var(--ok);color:#04210f}.REJECT{background:var(--bad);color:#fff}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;word-break:break-all;color:var(--mut)}
+.qubit{display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:5px;margin:2px;font:11px ui-monospace,monospace}.m1{background:#166534}.m0{background:#7f1d1d}
+table{width:100%;border-collapse:collapse;font-size:13.5px}td,th{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--mut);font-weight:600}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}h3{margin:0 0 6px}p{margin:6px 0}
+.sigid{font:700 26px ui-monospace,monospace;letter-spacing:1px}
+</style></head><body>
+
+<div id="auth"><div class="card">
+ <div class="logo">SignGuard</div><p class="sub" id="asub">Sign in to sign and verify documents with quantum signatures.</p>
+ <input id="su_email" class="hide" type="email" placeholder="Email" autocomplete="email">
+ <input id="id" placeholder="Username or email" autocomplete="username">
+ <input id="pw" type="password" placeholder="Password" autocomplete="current-password">
+ <button class="full" id="abtn" onclick="submitAuth()">Log in</button><p class="err" id="err"></p></div>
+ <div class="card switch" id="sw">Don't have an account? <a onclick="mode('signup')">Sign up</a></div></div>
+
+<div id="app" class="hide">
+<header><div class="logo">SignGuard</div>
+ <nav><button data-t="sign" class="on">Sign</button><button data-t="verify">Verify</button><button data-t="mine">My signatures</button><button data-t="lab">Attack lab</button></nav>
+ <span class="mono" id="who"></span><button class="ghost" onclick="logout()">Log out</button></header>
+<main>
+ <section id="t-sign" class="card"><h3>Sign a document</h3>
+  <p>Your file is fingerprinted (SHA-256). The fingerprint decides the basis and bit of every quantum signature qubit, which are then teleported to the verifier. The file itself is not stored.</p>
+  <label class="drop" id="d1"><input type="file" id="f1" class="hide"><span>Choose a file to sign</span></label>
+  <button class="full" onclick="doSign()">Sign document</button><p class="err" id="e1"></p><div id="r1"></div></section>
+
+ <section id="t-verify" class="card hide"><h3>Verify a document</h3>
+  <p>Upload the file you received and enter its signature ID. The verifier measures the stored qubits using the file you upload, so any change to the file breaks the match.</p>
+  <label class="drop" id="d2"><input type="file" id="f2" class="hide"><span>Choose the file to check</span></label>
+  <input id="sid" placeholder="Signature ID, e.g. SG-1A2B3C4D" list="mysigs"><datalist id="mysigs"></datalist>
+  <button class="full" onclick="doVerify()">Verify document</button><p class="err" id="e2"></p><div id="r2"></div></section>
+
+ <section id="t-mine" class="card hide"><h3>My signatures</h3><table><thead><tr><th>ID</th><th>File</th><th>Signed</th></tr></thead><tbody id="sigs"></tbody></table>
+  <h3 style="margin-top:20px">My verification checks</h3><table><thead><tr><th>ID</th><th>File checked</th><th>Mismatch</th><th>Result</th></tr></thead><tbody id="checks"></tbody></table></section>
+
+ <section id="t-lab" class="hide" style="display:grid;gap:14px"><div class="card"><h3>Attack lab</h3>
+  <p>Run a simulated round without a document to see how each attack behaves.</p>
+  <div class="row"><button onclick="lab('honest')">Honest signer</button><button class="bad" onclick="lab('channel_manipulation')">Channel manipulation</button><button class="bad" onclick="lab('forgery')">Forgery</button><button class="bad" onclick="lab('impersonation')">Impersonation</button><button class="bad" onclick="lab('replay')">Replay</button></div></div>
+  <div id="r3"></div><div class="card"><table><thead><tr><th>Scenario</th><th>Runs</th><th>Avg mismatch</th><th>Rejected</th></tr></thead><tbody id="byS"></tbody></table></div></section>
+</main></div>
+
+<script>
+const API=(location.port==='5000')?'':'http://127.0.0.1:5000';
+const $=i=>document.getElementById(i),esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let T=localStorage.getItem('sg_token')||'',M='login';
+async function call(u,o={}){o.headers=Object.assign({'X-Token':T},o.headers||{});
+ let r;try{r=await fetch(API+u,o)}catch(e){throw{error:'Cannot reach the server. Is main.py running?'}}
+ const d=await r.json().catch(()=>({error:'Unexpected server response.'}));
+ if(r.status===401&&T&&!u.includes('login')){logout(true)}
+ if(!r.ok)throw d;return d}
+const post=(u,b)=>call(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+function mode(m){M=m;const s=m==='signup';$('su_email').classList.toggle('hide',!s);$('id').placeholder=s?'Username':'Username or email';
+ $('pw').autocomplete=s?'new-password':'current-password';$('abtn').textContent=s?'Sign up':'Log in';$('err').textContent='';
+ $('asub').textContent=s?'Create an account to sign and verify documents.':'Sign in to sign and verify documents with quantum signatures.';
+ $('sw').innerHTML=s?'Have an account? <a onclick="mode(\'login\')">Log in</a>':'Don\'t have an account? <a onclick="mode(\'signup\')">Sign up</a>'}
+async function submitAuth(){$('err').textContent='';
+ try{const d=M==='signup'?await post('/api/signup',{email:$('su_email').value,username:$('id').value,password:$('pw').value})
+  :await post('/api/login',{email:$('id').value,password:$('pw').value});enter(d.token,d.user)}catch(e){$('err').textContent=e.error||'Something went wrong.'}}
+['id','pw','su_email'].forEach(i=>$(i).addEventListener('keydown',e=>e.key==='Enter'&&submitAuth()));
+function enter(t,u){T=t;localStorage.setItem('sg_token',t);$('auth').classList.add('hide');$('app').classList.remove('hide');$('who').textContent='@'+u.username;$('pw').value='';tab('sign')}
+async function logout(quiet){if(T&&!quiet)try{await post('/api/logout',{})}catch(e){}T='';localStorage.removeItem('sg_token');$('app').classList.add('hide');$('auth').classList.remove('hide')}
+function tab(t){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+ ['sign','verify','mine','lab'].forEach(x=>$('t-'+x).classList.toggle('hide',x!==t));if(t==='mine'||t==='verify')loadMine();if(t==='lab')loadLab()}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
+[['f1','d1'],['f2','d2']].forEach(([f,d])=>$(f).onchange=()=>{const x=$(f).files[0];$(d).classList.toggle('has',!!x);$(d).querySelector('span').textContent=x?x.name:'Choose a file'});
+function strip(r){return`<p>Basis and measured bit for the first ${r.sample.length} qubits. Green matched the expected bit, red did not.</p>`+r.sample.map(s=>`<span class="qubit ${s.match?'m1':'m0'}" title="basis ${s.basis}, expected ${s.expected_bit}, got ${s.measured_bit}">${s.basis}${s.measured_bit}</span>`).join('')}
+async function doSign(){$('e1').textContent='';$('r1').innerHTML='';const f=$('f1').files[0];if(!f)return $('e1').textContent='Choose a file to sign.';
+ const fd=new FormData();fd.append('file',f);try{const r=await call('/api/sign',{method:'POST',body:fd});
+ $('r1').innerHTML=`<div class="card" style="margin-top:12px"><p>Signed <b>${esc(r.filename)}</b> as @${esc(r.signer)}. Share this ID with whoever needs to verify the file:</p><div class="sigid">${r.signature_id}</div>
+ <p class="mono">SHA-256 ${r.doc_hash}</p><p>${r.n_qubits} qubits teleported to the verifier.</p><button onclick="$('sid').value='${r.signature_id}';tab('verify')">Verify a file with this ID</button></div>`}catch(e){$('e1').textContent=e.error||'Signing failed.'}}
+async function doVerify(){$('e2').textContent='';$('r2').innerHTML='';const f=$('f2').files[0];if(!f)return $('e2').textContent='Choose the file to check.';
+ if(!$('sid').value.trim())return $('e2').textContent='Enter the signature ID.';
+ const fd=new FormData();fd.append('file',f);fd.append('signature_id',$('sid').value);
+ try{const r=await call('/api/verify',{method:'POST',body:fd}),same=r.signed_hash===r.uploaded_hash;
+ $('r2').innerHTML=`<div class="card" style="margin-top:12px"><h3><span class="pill ${r.decision}">${r.decision==='ACCEPT'?'Signature valid':'Signature rejected'}</span></h3>
+ <p>${r.decision==='ACCEPT'?`Signed by <b>@${esc(r.signer)}</b>. The qubits agree with this document.`:'The qubits do not agree with this document. It was changed after signing, or this is not the signed file.'}</p>
+ <p>Mismatch rate <b>${(r.mismatch_rate*100).toFixed(1)}%</b> (limit ${(r.threshold*100).toFixed(0)}%). Chance a blind forger passes: <b>${r.forgery_probability.toExponential(2)}</b></p>
+ <p class="mono">Signed file fingerprint ${r.signed_hash}<br>Uploaded fingerprint ${r.uploaded_hash} (${same?'identical':'different'})</p>${strip(r)}</div>`}catch(e){$('e2').textContent=e.error||'Verification failed.'}}
+async function loadMine(){const d=await call('/api/signatures');const t=x=>new Date(x*1000).toLocaleString();
+ $('sigs').innerHTML=d.signatures.map(s=>`<tr><td class="mono">${s.id}</td><td>${esc(s.filename)}</td><td>${t(s.created)}</td></tr>`).join('')||'<tr><td colspan=3>Nothing signed yet. Use the Sign tab.</td></tr>';
+ $('checks').innerHTML=d.verifications.map(v=>`<tr><td class="mono">${v.sig_id}</td><td>${esc(v.filename)}</td><td>${(v.mismatch_rate*100).toFixed(1)}%</td><td><span class="pill ${v.decision}">${v.decision}</span></td></tr>`).join('')||'<tr><td colspan=4>No checks yet.</td></tr>';
+ $('mysigs').innerHTML=d.signatures.map(s=>`<option value="${s.id}">${esc(s.filename)}</option>`).join('')}
+const label=s=>s.replace(/_/g,' ').replace(/^\w/,c=>c.toUpperCase());
+async function lab(s){const r=await call('/api/run/'+s+'?n=32&threshold=0.15',{method:'POST'});
+ $('r3').innerHTML=`<div class="card"><h3>${label(r.scenario)} <span class="pill ${r.decision}">${r.decision}</span></h3><p>Mismatch <b>${(r.mismatch_rate*100).toFixed(1)}%</b> (limit ${(r.threshold*100).toFixed(0)}%)</p>${strip(r)}</div>`;loadLab()}
+async function loadLab(){const d=await call('/api/dashboard');$('byS').innerHTML=d.by_scenario.map(s=>`<tr><td>${label(s.scenario)}</td><td>${s.n}</td><td>${(s.avg_mismatch*100).toFixed(1)}%</td><td>${s.rejected}</td></tr>`).join('')||'<tr><td colspan=4>No runs yet.</td></tr>'}
+(async()=>{if(T)try{const d=await call('/api/me');enter(T,d.user)}catch(e){}})();
+</script></body></html>
